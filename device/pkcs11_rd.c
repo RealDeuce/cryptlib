@@ -172,9 +172,8 @@ static int getObjectLabel( INOUT_PTR PKCS11_INFO *pkcs11Info,
 	*labelLength = 0;
 
 	cryptStatus = getAttributeValue( pkcs11Info, hObject, CKA_LABEL, 
-									 ( void ** ) &localLabel, 
-									 &localLabelLength, labelBuffer, 
-									 CRYPT_MAX_TEXTSIZE );
+									 &localLabel, &localLabelLength, 
+									 labelBuffer, CRYPT_MAX_TEXTSIZE );
 	if( cryptStatusError( cryptStatus ) )
 		return( cryptStatus );
 	*labelLength = min( localLabelLength, maxLabelSize );
@@ -374,18 +373,13 @@ static int getMechanismInfo( IN_PTR const PKCS11_INFO *pkcs11Info,
 	ENSURES( LOOP_BOUND_OK );
 	if( i >= mechanismInfoSize )
 		{
-		/* CK_KEY_TYPE is an unsigned long but it only ever has a value that
-		   will fit inside a char, to avoid compiler warnings we move it to
-		   an int before using it in an error message */
-		const int keyTypeInt = ( unsigned int ) keyType;
-
 		/* If we can't find a match for the PKCS #11 algorithm type in the 
 		   list of mechanisms then we're trying to instantiate an object 
 		   that uses an unsupported algorithm type */
 		retExt( CRYPT_ERROR_NOTAVAIL,
 				( CRYPT_ERROR_NOTAVAIL, errorInfo,
 				  "PKCS #11 algorithm type %d for object isn't available "
-				  "in cryptlib", keyTypeInt ) );
+				  "in cryptlib", keyType ) );
 		}
 	mechanismInfoPtr = &mechanismInfoPtr[ i ];
 	*cryptAlgo = mechanismInfoPtr->cryptAlgo;
@@ -425,8 +419,8 @@ int getEccCurveInfo( INOUT_PTR PKCS11_INFO *pkcs11Info,
 	   being used.  In order to get the curve information from that we have 
 	   to read the OID and then convert it to the named-curve type */
 	cryptStatus = getAttributeValue( pkcs11Info, hObject, CKA_EC_PARAMS,
-									 ( void ** ) &ecOid, &ecOidLength, 
-									 ecOidBuffer, MAX_OID_SIZE );
+									 &ecOid, &ecOidLength, ecOidBuffer,
+									 MAX_OID_SIZE );
 	if( cryptStatusError( cryptStatus ) )
 		{
 		retExt( cryptStatus,
@@ -644,7 +638,7 @@ static int instantiateCert( INOUT_PTR PKCS11_INFO *pkcs11Info,
 	   for this because it's a PKCS #11 attribute rather than a cryptlib 
 	   attribute */
 	cryptStatus = getAttributeValue( pkcs11Info, hCertificate, CKA_VALUE, 
-									 ( void ** ) &bufPtr, &length, buffer, 
+									 &bufPtr, &length, buffer, 
 									 MAX_STACK_BUFFER_SIZE );
 	if( cryptStatusError( cryptStatus ) )
 		{
@@ -856,7 +850,7 @@ int findObjectFromObject( INOUT_PTR PKCS11_INFO *pkcs11Info,
 	   read its certificate ID.  We can't use a dynBuf for this because it's 
 	   a PKCS #11 attribute rather than a cryptlib attribute */
 	cryptStatus = getAttributeValue( pkcs11Info, hSourceObject, CKA_ID, 
-									 ( void ** ) &bufPtr, &length, buffer, 
+									 &bufPtr, &length, buffer, 
 									 MAX_STACK_BUFFER_SIZE );
 	if( cryptStatusError( cryptStatus ) )
 		return( cryptStatus );
@@ -1070,9 +1064,8 @@ static int findCertFromObject( INOUT_PTR PKCS11_INFO *pkcs11Info,
 	/* We're looking for a certificate whose ID matches the object, read the 
 	   key ID from the device.  We can't use a dynBuf for this because it's a 
 	   PKCS #11 attribute rather than a cryptlib attribute */
-	cryptStatus = getAttributeValue( pkcs11Info, hObject, CKA_ID, 
-									 ( void ** ) &bufPtr, &length, buffer, 
-									 MAX_STACK_BUFFER_SIZE );
+	cryptStatus = getAttributeValue( pkcs11Info, hObject, CKA_ID, &bufPtr, 
+									 &length, buffer, MAX_STACK_BUFFER_SIZE );
 	if( cryptStatusError( cryptStatus ) )
 		return( cryptStatus );
 

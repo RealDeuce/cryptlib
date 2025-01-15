@@ -375,18 +375,12 @@ typedef struct {
 	   bits and pieces, which give an attacker lots of leeway to fiddle with
 	   the credentials being submitted on different passes of the 
 	   authentication to try and confuse the server.  To avoid this problem
-	   we require that the user name and optionally keyID if pubkey 
-	   authentication is being used remains constant over different 
-	   iterations of authentication, as well as tracking transitions from
-	   the previous authentication type to the current authentication type
-	   (e.g. query -> password auth) to make sure they're valid.  This
-	   unfortunately means potentially recording a pile of server-side 
-	   authentication state for each session */
+	   we require that the userID and authentication method remain constant
+	   over different iterations of authentication, which unfortunately 
+	   means recording a pile of server-side authentication state */
 	BUFFER_FIXED( KEYID_SIZE ) \
-	BYTE prevAuthUserNameHash[ KEYID_SIZE + 8 ];	/* Hashed userID */
-	/* SSH_AUTHTYPE_TYPE */ int prevAuthType;/* Authentication method */
-	BUFFER_FIXED( KEYID_SIZE ) \
-	BYTE prevAuthKeyID[ KEYID_SIZE + 8 ];	/* Pubkey auth keyID */
+	BYTE authUserNameHash[ KEYID_SIZE + 8 ];/* Hashed userID */
+	/* SSH_AUTHTYPE_TYPE */ int authType;	/* Authentication method */
 	} SSH_INFO;
 #endif /* USE_SSH */
 

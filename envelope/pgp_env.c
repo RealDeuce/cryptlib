@@ -1,7 +1,7 @@
 /****************************************************************************
 *																			*
 *					 cryptlib PGP Enveloping Routines						*
-*					 Copyright Peter Gutmann 1996-2024						*
+*					 Copyright Peter Gutmann 1996-2016						*
 *																			*
 ****************************************************************************/
 
@@ -112,7 +112,9 @@ static int copyToEnvelopeAlt( INOUT_PTR ENVELOPE_INFO *envelopeInfoPtr,
 		{ PGP_PACKET_SIGNATURE_ONEPASS, CRYPT_CONTENT_SIGNEDDATA },
 		{ CRYPT_ERROR, CRYPT_ERROR }, { CRYPT_ERROR, CRYPT_ERROR }
 		};
-	ENV_COPYTOENVELOPE_FUNCTION copyToEnvelopeFunction;
+	const ENV_COPYTOENVELOPE_FUNCTION copyToEnvelopeFunction = \
+				( ENV_COPYTOENVELOPE_FUNCTION ) \
+				FNPTR_GET( envelopeInfoPtr->copyToEnvelopeFunction );
 	STREAM stream;
 	long contentLength;
 	int ctb DUMMY_INIT, version, packetType, value, status;
@@ -123,6 +125,7 @@ static int copyToEnvelopeAlt( INOUT_PTR ENVELOPE_INFO *envelopeInfoPtr,
 	REQUIRES( sanityCheckPGPEnv( envelopeInfoPtr ) );
 	REQUIRES( ( buffer == NULL && length == 0 ) || \
 			  ( buffer != NULL && isBufsizeRange( length ) ) );
+	REQUIRES( copyToEnvelopeFunction != NULL );
 
 	/* If it's a flush then it's always an error, since there must be nested 
 	   content */
@@ -202,9 +205,6 @@ static int copyToEnvelopeAlt( INOUT_PTR ENVELOPE_INFO *envelopeInfoPtr,
 	/* Reset the envelope data processing to the standard mechanism and pass 
 	   the data on to the standard function */
 	initEnvelopeStreaming( envelopeInfoPtr );
-	copyToEnvelopeFunction = ( ENV_COPYTOENVELOPE_FUNCTION ) \
-					FNPTR_GET( envelopeInfoPtr->copyToEnvelopeFunction );
-	REQUIRES( copyToEnvelopeFunction != NULL );
 	return( copyToEnvelopeFunction( envelopeInfoPtr, buffer, length ) );
 	}
 
@@ -513,63 +513,28 @@ static int writeKeyex( INOUT_PTR ENVELOPE_INFO *envelopeInfoPtr,
 	return( status );
 	}
 
-/* Write the header for encrypted-data packets, either Symmetrically 
-   Encrypted Data Packet (type 9) or Sym. Encrypted Integrity Protected Data 
-   Packet (type 18).  This gets a bit complicated because if we're 
-   enveloping raw data then the calling code inserts a literal data packet 
-   inside the encrypted content to encapsulate the raw data but if it's 
-   anything else, for example a signed-data packet, then we just add it as 
-   is.  This means that the encrypted content size is slightly larger if 
-   we're processing raw data due to the insertion of the literal data
-   packet by the calling code.  In addition the MDC'ed version of the 
-   encrypted data packet has an extra version number following the length,
-   leading to four different variants (two MDC ones merged):
-
-	Raw data:	ctb || len ||		  iv + 2 || ctb || len || literal hdr. || data
-	!Raw data:	ctb || len ||		  iv + 2 ||								  data
-	MDC:		ctb || len || 0x01 || iv + 2 || ... */
-
 CHECK_RETVAL STDC_NONNULL_ARG( ( 1 ) ) \
 static int writeEncryptedContentHeader( INOUT_PTR ENVELOPE_INFO *envelopeInfoPtr )
 	{
 	CRYPT_CONTEXT iMdcContext = CRYPT_UNUSED;
-	STREAM stream;
-	BYTE ivInfoBuffer[ ( CRYPT_MAX_IVSIZE + 2 ) + 8 ];
 	const BOOLEAN hasMDC = \
 			TEST_FLAG( envelopeInfoPtr->flags, ENVELOPE_FLAG_AUTHENC ) ? \
 			TRUE : FALSE;
-	const BOOLEAN isLiteralData = \
-			( envelopeInfoPtr->contentType == CRYPT_CONTENT_DATA ) ? \
-			TRUE : FALSE;
+	STREAM stream;
+	BYTE ivInfoBuffer[ ( CRYPT_MAX_IVSIZE + 2 ) + 8 ];
+	const int packetType = hasMDC ? PGP_PACKET_ENCR_MDC : PGP_PACKET_ENCR;
+	const int payloadDataSize = PGP_DATA_HEADER_SIZE + \
+							    envelopeInfoPtr->payloadSize + \
+								( hasMDC ? PGP_MDC_PACKET_SIZE : 0 );
 	const int dataLeft = min( envelopeInfoPtr->bufSize - \
 								envelopeInfoPtr->bufPos, 
 							  MAX_INTLENGTH_SHORT - 1 );
-	int payloadDataSize = envelopeInfoPtr->payloadSize, ivSize, status;
+	int ivSize, status;
 
 	assert( isWritePtr( envelopeInfoPtr, sizeof( ENVELOPE_INFO ) ) );
 
-	ENSURES( isIntegerRange( payloadDataSize ) );
+	ENSURES( isIntegerRangeMin( payloadDataSize, PGP_DATA_HEADER_SIZE ) );
 	ENSURES( isShortIntegerRange( dataLeft ) );
-
-	/* If we're processing raw data, the total length gets extended by the 
-	   size of the literal data header that gets inserted (by the caller) 
-	   before the data itself */
-	if( isLiteralData )
-		{
-		int literalHeaderLen DUMMY_INIT;
-
-		sMemNullOpen( &stream );
-		status = pgpWritePacketHeader( &stream, PGP_PACKET_DATA, 
-						PGP_DATA_HEADER_SIZE + envelopeInfoPtr->payloadSize );
-		if( cryptStatusOK( status ) )
-			status = swrite( &stream, PGP_DATA_HEADER, PGP_DATA_HEADER_SIZE );
-		if( cryptStatusOK( status ) )
-			literalHeaderLen = stell( &stream );
-		sMemClose( &stream );
-		if( cryptStatusError( status ) )
-			return( status );
-		payloadDataSize += literalHeaderLen;
-		}
 
 	/* Get the IV size and make sure that there's enough room to emit the 
 	   encrypted content header (+8 for slop space) */
@@ -578,8 +543,8 @@ static int writeEncryptedContentHeader( INOUT_PTR ENVELOPE_INFO *envelopeInfoPtr
 							  CRYPT_CTXINFO_IVSIZE );
 	if( cryptStatusError( status ) )
 		return( status );
-	if( dataLeft < PGP_MAX_HEADER_SIZE + ( hasMDC ? 1 : 0 ) + \
-										 ( ivSize + 2 ) + 8 )
+	if( dataLeft < PGP_MAX_HEADER_SIZE + ( ivSize + 2 ) + \
+									( hasMDC ? 1 : 0 ) + 8 )
 		return( CRYPT_ERROR_OVERFLOW );
 
 	/* If we're using an MDC then we need to hash the IV information before 
@@ -594,31 +559,26 @@ static int writeEncryptedContentHeader( INOUT_PTR ENVELOPE_INFO *envelopeInfoPtr
 		iMdcContext = actionListPtr->iCryptHandle;
 		}
 
-	/* Set up the special-snowflake PGP IV */
+	/* Set up the PGP IV information */
 	status = pgpProcessIV( envelopeInfoPtr->iCryptContext, 
 						   ivInfoBuffer, ivSize + 2, ivSize, 
 						   iMdcContext, TRUE );
 	if( cryptStatusError( status ) )
 		return( status );
 
-	/* Write the encrypted content header */
+	/* Write the encrypted content header, with the length being the size of 
+	   the optional MDC indicator, the inner data CTB and length, and the
+	   combined inner data header, payload, and optional MDC */
 	sMemOpen( &stream, envelopeInfoPtr->buffer + envelopeInfoPtr->bufPos, 
 			  dataLeft );
+	pgpWritePacketHeader( &stream, packetType, 
+						  ( hasMDC ? 1 : 0 ) + ( ivSize + 2 ) + \
+						  1 + pgpSizeofLength( payloadDataSize ) + \
+						  payloadDataSize );
 	if( hasMDC )
 		{
-		/* The content is an MDC-protected packet consisting of a version 
-		   number, the special-snowflake IV, the data, and an MDC packet */
-		pgpWritePacketHeader( &stream, PGP_PACKET_ENCR_MDC, 
-							  1 + ( ivSize + 2 ) + payloadDataSize + \
-												   PGP_MDC_PACKET_SIZE );
-		sputc( &stream, 1 );	/* Version number */
-		}
-	else
-		{
-		/* It's a standard encrypted data packet consisting of the special-
-		   snowflake IV and the data */ 
-		pgpWritePacketHeader( &stream, PGP_PACKET_ENCR, 
-							  ( ivSize + 2 ) + payloadDataSize );
+		/* MDC-encrypted data has a version number before the data */
+		sputc( &stream, 1 );
 		}
 	status = swrite( &stream, ivInfoBuffer, ivSize + 2 );
 	if( cryptStatusOK( status ) )
