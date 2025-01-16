@@ -555,15 +555,15 @@ static int createSessionOpenRequest( INOUT_PTR SESSION_INFO *sessionInfoPtr,
 	writeUint32( stream, channelNo );
 	writeString32( stream, "pty-req", 7 );
 	sputc( stream, 0 );					/* No reply */
-	if( cryptStatusError( status = getSessionAttributeS( sessionInfoPtr, &term, CRYPT_SESSINFO_SSH_TERMINAL) ) )
+	if( cryptStatusError( status = getChannelAttributeS( sessionInfoPtr, CRYPT_SESSINFO_SSH_CHANNEL_TERMINAL, term.data, sizeof(termString), &term.length) ) || term.length == 0 )
 		writeString32( stream, "xterm", 5 );/* Generic */
 	else
 		writeString32( stream, term.data, term.length );/* Generic */
-	if( cryptStatusError( getSessionAttribute( sessionInfoPtr, &value, CRYPT_SESSINFO_SSH_WIDTH ) ) )
+	if( cryptStatusError( getChannelAttribute( sessionInfoPtr, CRYPT_SESSINFO_SSH_CHANNEL_WIDTH, &value ) ) || value == 0 )
 		writeUint32( stream, 80 );
 	else
 		writeUint32( stream, value);
-	if( cryptStatusError( getSessionAttribute( sessionInfoPtr, &value, CRYPT_SESSINFO_SSH_HEIGHT ) ) )
+	if( cryptStatusError( getChannelAttribute( sessionInfoPtr, CRYPT_SESSINFO_SSH_CHANNEL_HEIGHT, &value ) ) || value == 0 )
 		writeUint32( stream, 48 );		/* 48 x 80 (24 x 80 is so 1970s) */
 	else
 		writeUint32( stream, value);
