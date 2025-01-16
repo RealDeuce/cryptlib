@@ -610,11 +610,6 @@ int processChannelOpenConfirmation( INOUT_PTR SESSION_INFO *sessionInfoPtr, INOU
 	BOOLEAN waitforWindow = FALSE;
 	int length;
 
-	status = getServiceType( sessionInfoPtr, &serviceType );
-	if( cryptStatusError( status ) ) {
-		return( status );
-	}
-
 	origWriteChannelNo = sessionInfoPtr->sessionSSH->currWriteChannel;
 	status = currentChannelNo = readUint32( stream );
 
@@ -635,6 +630,11 @@ int processChannelOpenConfirmation( INOUT_PTR SESSION_INFO *sessionInfoPtr, INOU
 				  "Invalid channel information in channel open "
 				  "confirmation for channel %lX", channelNo ) );
 		}
+	status = getServiceType( sessionInfoPtr, &serviceType );
+	if( cryptStatusError( status ) ) {
+		return( status );
+	}
+
 	status = sread( stream, buffer, UINT32_SIZE );
 	if( !cryptStatusError( status ) && \
 		!memcmp( buffer, "\x00\x00\x00\x00", UINT32_SIZE ) )
