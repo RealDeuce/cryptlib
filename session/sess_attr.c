@@ -818,8 +818,6 @@ int getSessionAttribute( INOUT_PTR SESSION_INFO *sessionInfoPtr,
 								   SESSION_FLAG_ISOPEN ) ? TRUE : FALSE;
 			return( CRYPT_OK );
 
-		case CRYPT_SESSINFO_SSH_HEIGHT:
-		case CRYPT_SESSINFO_SSH_WIDTH:
 		case CRYPT_SESSINFO_SERVER_PORT:
 		case CRYPT_SESSINFO_CLIENT_PORT:
 			{
@@ -895,7 +893,6 @@ int getSessionAttributeS( INOUT_PTR SESSION_INFO *sessionInfoPtr,
 			return( CRYPT_ERROR_NOTFOUND );
 			}
 
-		case CRYPT_SESSINFO_SSH_TERMINAL:
 		case CRYPT_SESSINFO_USERNAME:
 		case CRYPT_SESSINFO_PASSWORD:
 		case CRYPT_SESSINFO_AUTHTOKEN:
@@ -1063,13 +1060,6 @@ int setSessionAttribute( INOUT_PTR SESSION_INFO *sessionInfoPtr,
 				}
 			return( status );
 			}
-
-		case CRYPT_SESSINFO_SSH_WIDTH:
-			return( addSessionInfo( sessionInfoPtr,
-									CRYPT_SESSINFO_SSH_WIDTH, value ) );
-		case CRYPT_SESSINFO_SSH_HEIGHT:
-			return( addSessionInfo( sessionInfoPtr,
-									CRYPT_SESSINFO_SSH_HEIGHT, value ) );
 
 		case CRYPT_SESSINFO_SERVER_PORT:
 			/* If there's already a network socket specified then we can't 
@@ -1239,9 +1229,6 @@ int setSessionAttributeS( INOUT_PTR SESSION_INFO *sessionInfoPtr,
 			return( addCredential( sessionInfoPtr, data, dataLength, 
 								   attribute ) );
 
-		case CRYPT_SESSINFO_SSH_TERMINAL:
-		case CRYPT_SESSINFO_SSH_WIDTH:
-		case CRYPT_SESSINFO_SSH_HEIGHT:
 		case CRYPT_SESSINFO_SERVER_FINGERPRINT_SHA1:
 			/* Remember the value */
 			return( addSessionInfoS( sessionInfoPtr, attribute, data, 
@@ -1305,7 +1292,6 @@ int deleteSessionAttribute( INOUT_PTR SESSION_INFO *sessionInfoPtr,
 			sessionInfoPtr->writeTimeout = CRYPT_ERROR;
 			return( CRYPT_OK );
 
-		case CRYPT_SESSINFO_SSH_TERMINAL:
 		case CRYPT_SESSINFO_USERNAME:
 		case CRYPT_SESSINFO_PASSWORD:
 		case CRYPT_SESSINFO_AUTHTOKEN:
