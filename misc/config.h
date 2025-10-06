@@ -67,6 +67,7 @@
 #define PREFER_ECC
 #define USE_SSH_CTR
 #define CONFIG_NUM_OBJECTS 16384
+#define USE_CHACHA20
 /****************************************************************************
 *																			*
 *						Custom Configuration Profiles						*
